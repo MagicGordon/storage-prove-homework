@@ -2,6 +2,12 @@
 
 pub use pallet::*;
 
+#[cfg(test)]
+mod mock;
+
+#[cfg(test)]
+mod tests;
+
 #[frame_support::pallet]
 pub mod pallet {
     use frame_support::{
@@ -14,6 +20,8 @@ pub mod pallet {
     #[pallet::config]
     pub trait Config: frame_system::Config {
         type Event: From<Event<Self>> + IsType<<Self as frame_system::Config>::Event>;
+
+		type HashLimit: Get<u32>;
     }
 
     #[pallet::pallet]
@@ -36,7 +44,8 @@ pub mod pallet {
     #[pallet::error]
     pub enum Error<T> {
         ProofAlreadyExist,
-        ClaimNotExist
+        ClaimNotExist,
+        BadHash
     }
 
     #[pallet::hooks]
@@ -48,6 +57,8 @@ pub mod pallet {
         #[pallet::weight(0)]
         pub fn create_claim(origin: OriginFor<T>, claim: Vec<u8>) -> DispatchResultWithPostInfo{
             let sender = ensure_signed(origin)?;
+
+            ensure!(claim.len() <= T::HashLimit::get() as usize, Error::<T>::BadHash);
 
             ensure!(!Proofs::<T>::contains_key(&claim), Error::<T>::ProofAlreadyExist);
 
@@ -64,6 +75,8 @@ pub mod pallet {
         pub fn revoke_claim(origin: OriginFor<T>, claim: Vec<u8>) -> DispatchResultWithPostInfo{
             let sender = ensure_signed(origin)?;
 
+            ensure!(claim.len() <= T::HashLimit::get() as usize, Error::<T>::BadHash);
+
             let (owner, _) = Proofs::<T>::get(&claim).ok_or(Error::<T>::ClaimNotExist)?;
 
             ensure!(owner == sender, Error::<T>::ClaimNotExist);
@@ -77,6 +90,8 @@ pub mod pallet {
         #[pallet::weight(0)]
         pub fn change_owner(origin: OriginFor<T>, claim: Vec<u8>, new_owner: T::AccountId) -> DispatchResultWithPostInfo{
             let sender = ensure_signed(origin)?;
+
+            ensure!(claim.len() <= T::HashLimit::get() as usize, Error::<T>::BadHash);
 
             let (owner, _) = Proofs::<T>::get(&claim).ok_or(Error::<T>::ClaimNotExist)?;
 
